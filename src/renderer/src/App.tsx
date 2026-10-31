@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Home, Layers3, Puzzle, Settings, ChevronDown, Play, Plus,
   Monitor, Cpu, HardDrive, Sparkles, ShieldCheck, CircleHelp,
@@ -19,6 +19,33 @@ function App() {
   const [version, setVersion] = useState("1.21.4");
   const [ram, setRam] = useState(4);
   const [notice, setNotice] = useState("Your next adventure starts here.");
+  const [instances, setInstances] = useState<CrescentInstance[]>([]);
+  const [instanceBusy, setInstanceBusy] = useState(false);
+
+  useEffect(() => {
+    if (!window.crescent) return;
+    void Promise.all([window.crescent.listInstances(), window.crescent.getSettings(), window.crescent.getVersions()])
+      .then(([savedInstances, settings, manifest]) => {
+        setInstances(savedInstances);
+        setRam(settings.ramGb);
+        setVersion(manifest.latest.release);
+      })
+      .catch(() => setNotice("Some local services could not be loaded. You can still explore the interface."));
+  }, []);
+
+  const createInstance = async () => {
+    if (!window.crescent || instanceBusy) return;
+    const name = window.prompt("Name your new Minecraft instance:", "My Crescent World");
+    if (!name?.trim()) return;
+    setInstanceBusy(true);
+    try {
+      const created = await window.crescent.createInstance({ name, version });
+      setInstances(current => [created, ...current]);
+      setNotice(`Instance “${created.name}” was created locally.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not create the instance.");
+    } finally { setInstanceBusy(false); }
+  };
 
   const announce = (message: string) => setNotice(message);
 
@@ -71,7 +98,7 @@ function App() {
                 <h1>Beyond the<br /><em>Moon.</em></h1>
                 <p>A calmer, cleaner way to experience your worlds.<br />Your journey begins with Crescent.</p>
                 <div className="hero-actions">
-                  <button className="primary-button" onClick={() => announce("Game launching is not implemented yet.")}><Play size={16} fill="currentColor" /> Play Minecraft</button>
+                  <button className="primary-button" onClick={() => announce("Game launching is not available yet. Instance setup is now working locally.")}><Play size={16} fill="currentColor" /> Play Minecraft</button>
                   <button className="secondary-button" onClick={() => setPage("Instances")}>Manage instances <ChevronDown size={15} /></button>
                 </div>
               </div>
@@ -95,7 +122,7 @@ function App() {
               <div className="panel ram-panel">
                 <div className="panel-top"><div className="panel-icon"><Cpu size={17} /></div><span>MEMORY ALLOCATION</span><span className="panel-status">TUNING</span></div>
                 <div className="ram-value">{ram}<small> GB</small></div>
-                <input aria-label="Memory allocation" type="range" min="2" max="8" step="1" value={ram} onChange={e => setRam(Number(e.target.value))} />
+                <input aria-label="Memory allocation" type="range" min="2" max="8" step="1" value={ram} onChange={e => { const value = Number(e.target.value); setRam(value); void window.crescent?.saveSettings({ ramGb: value }).catch(() => setNotice("Could not save RAM settings.")); }} />
                 <div className="range-labels"><span>2 GB</span><span>8 GB</span></div>
                 <div className="panel-foot"><HardDrive size={13} /> Adjust based on your system memory</div>
               </div>
@@ -115,11 +142,24 @@ function App() {
           <div className="page-content simple-page">
             <div className="section-kicker">GAME MANAGEMENT</div><h1 className="page-title">Your instances<span>.</span></h1>
             <p className="page-description">Keep every Minecraft setup organized, separate, and ready when you are.</p>
-            <div className="empty-state panel">
-              <div className="empty-icon"><Layers3 size={26} /></div><h2>No instances yet</h2>
-              <p>Create a dedicated profile for Vanilla, Fabric, Forge, or your own modded setup.</p>
-              <button className="primary-button" onClick={() => announce("Instance creation is coming soon.")}><Plus size={16} /> Create instance</button>
-            </div>
+            {instances.length === 0 ? (
+              <div className="empty-state panel">
+                <div className="empty-icon"><Layers3 size={26} /></div><h2>No instances yet</h2>
+                <p>Create a separate local Vanilla profile. Fabric and Forge support will come in a later milestone.</p>
+                <button className="primary-button" disabled={instanceBusy} onClick={() => void createInstance()}><Plus size={16} /> {instanceBusy ? "Creating..." : "Create instance"}</button>
+              </div>
+            ) : (
+              <div className="instance-list">
+                {instances.map(instance => (
+                  <div className="panel instance-card" key={instance.id}>
+                    <div className="panel-icon"><Layers3 size={18} /></div>
+                    <div className="instance-info"><strong>{instance.name}</strong><p>Minecraft {instance.version} · Vanilla · Separate mods and config folders</p></div>
+                    <span className="panel-status">LOCAL</span>
+                  </div>
+                ))}
+                <button className="secondary-button" disabled={instanceBusy} onClick={() => void createInstance()}><Plus size={15} /> Create another instance</button>
+              </div>
+            )}
           </div>
         )}
 
