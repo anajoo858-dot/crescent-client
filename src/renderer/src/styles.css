@@ -86,3 +86,10 @@ input[type=range]{width:100%;accent-color:#d7d9e0;height:3px}
 .settings-row{display:flex;align-items:center;gap:14px;padding:16px;margin-bottom:10px}.settings-row>div:nth-child(2){flex:1}.settings-row strong{font:600 11px Manrope}.settings-row p{font-size:9px;color:#858a96;margin:4px 0 0}
 @media(max-width:1150px){.sidebar{width:210px}.page-content{padding-left:30px;padding-right:30px}.topbar{padding:0 30px}.hero h1{font-size:41px}.moon-scene{right:2%}.setup-grid{grid-template-columns:1fr 1fr}.status-panel{grid-column:span 2}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;scroll-behavior:auto!important}}
+.instance-list{display:grid;gap:11px}
+.instance-card{display:flex;align-items:center;gap:14px;padding:16px}
+.instance-info{flex:1;min-width:0}
+.instance-info strong{font:700 12px Manrope}
+.instance-info p{font-size:9px;color:#858a96;margin:5px 0 0}
+.instance-list>.secondary-button{justify-self:start}
+button:disabled{opacity:.55;cursor:not-allowed;transform:none}
