@@ -20,7 +20,13 @@ export default defineConfig({
     }
   },
   renderer: {
+    root: resolve("."),
     resolve: { alias: { "@": resolve("src/renderer/src") } },
-    plugins: [react()]
+    plugins: [react()],
+    build: {
+      rollupOptions: {
+        input: resolve("index.html")
+      }
+    }
   }
 });
