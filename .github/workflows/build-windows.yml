@@ -66,16 +66,16 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.10.2"
+          gradle-version: "9.6.0"
 
       - name: Build Crescent Fabric JAR
         run: gradle --no-daemon clean build
@@ -83,7 +83,7 @@ jobs:
       - name: Upload Crescent Fabric JAR
         uses: actions/upload-artifact@v4
         with:
-          name: Crescent-Fabric-1.21.1
+          name: Crescent-Fabric-26.3
           path: crescent-fabric/build/libs/crescent-client-0.1.0.jar
           if-no-files-found: error
           retention-days: 14
