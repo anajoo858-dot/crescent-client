@@ -1,0 +1,16 @@
+[package]
+name = "crescent-client"
+version = "0.2.0"
+description = "Crescent Minecraft Client"
+authors = ["Crescent Studio"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json"] }
+uuid = { version = "1", features = ["v4"] }

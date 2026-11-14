@@ -3,7 +3,11 @@
     "target": "ES2022",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
@@ -12,7 +16,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "types": ["vite/client", "node"]
+    "types": [
+      "vite/client",
+      "node"
+    ]
   },
-  "include": ["electron.vite.config.ts", "electron", "src"]
+  "include": [
+    "vite.config.ts",
+    "src"
+  ]
 }

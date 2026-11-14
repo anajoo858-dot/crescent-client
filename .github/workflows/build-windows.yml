@@ -2,6 +2,8 @@ name: Build Windows Installer
 
 on:
   push:
+    branches: [main, migration/rust-tauri-v2]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -19,6 +21,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
 
       - name: Install dependencies
         run: npm install
@@ -26,13 +37,13 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
-      - name: Build Windows installer
-        run: npm run dist:win
+      - name: Build Tauri application
+        run: npm run build
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: Crescent-Client-Windows-x64
-          path: release/*.exe
+          path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
           retention-days: 14

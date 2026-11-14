@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Crescent Client",
+  "version": "0.2.0",
+  "identifier": "studio.x3m.crescent",
+  "build": {
+    "beforeDevCommand": "npm run frontend:dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build:frontend",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Crescent Client",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1080,
+        "minHeight": 700,
+        "backgroundColor": "#08090c"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost https: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src ipc: http://ipc.localhost https: http://127.0.0.1:1420"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Game",
+    "shortDescription": "A modern Minecraft launcher",
+    "longDescription": "Crescent Client is a modern Minecraft launcher built with Rust and Tauri."
+  }
+}
