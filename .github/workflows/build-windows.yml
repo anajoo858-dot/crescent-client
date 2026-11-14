@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows:
@@ -87,3 +87,16 @@ jobs:
           path: crescent-fabric/build/libs/crescent-client-0.1.0.jar
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish Crescent 26.3 mod release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: crescent-26.3
+          name: Crescent Client Mod for Minecraft 26.3
+          body: Automated Crescent Fabric mod build for Minecraft 26.3.
+          files: build/libs/crescent-client-0.1.0.jar
+          overwrite_files: true
+          prerelease: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
