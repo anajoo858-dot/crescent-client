@@ -176,14 +176,21 @@ async fn get_versions() -> Result<serde_json::Value, String> {
     }
     let manifest: serde_json::Value = response.json().await
         .map_err(|error| format!("Could not parse Minecraft version manifest: {error}"))?;
-    let releases: Vec<String> = manifest["versions"].as_array()
-        .ok_or("Minecraft version manifest has no versions list")?
-        .iter()
-        .filter(|item| item["type"].as_str() == Some("release"))
-        .take(80)
-        .filter_map(|item| item["id"].as_str().map(str::to_owned))
-        .collect();
-    Ok(serde_json::json!({ "latest": manifest["latest"], "releases": releases }))
+    let versions = manifest["versions"].as_array()
+        .ok_or("Minecraft version manifest has no versions list")?;
+    let collect_type = |kind: &str| -> Vec<String> {
+        versions.iter()
+            .filter(|item| item["type"].as_str() == Some(kind))
+            .filter_map(|item| item["id"].as_str().map(str::to_owned))
+            .collect()
+    };
+    Ok(serde_json::json!({
+        "latest": manifest["latest"],
+        "releases": collect_type("release"),
+        "snapshots": collect_type("snapshot"),
+        "oldBetas": collect_type("old_beta"),
+        "oldAlphas": collect_type("old_alpha")
+    }))
 }
 
 #[tauri::command]
@@ -213,10 +220,11 @@ fn create_instance(app: AppHandle, input: CreateInstanceInput) -> Result<Instanc
         || !name.chars().all(|ch| ch.is_alphanumeric() || " _.-".contains(ch)) {
         return Err("Choose an instance name using letters, numbers, spaces, dots, dashes, or underscores (up to 32 characters).".into());
     }
-    let parts: Vec<&str> = version.split('.').collect();
-    if !(2..=3).contains(&parts.len())
-        || parts.iter().any(|part| part.is_empty() || !part.chars().all(|ch| ch.is_ascii_digit())) {
-        return Err("Choose a valid Minecraft release version.".into());
+    if version.is_empty() || version.len() > 64
+        || !version.bytes().all(|ch| ch.is_ascii_alphanumeric() || b"._-".contains(&ch))
+        || !version.bytes().any(|ch| ch.is_ascii_digit())
+        || version == "." || version == ".." {
+        return Err("Choose a valid Minecraft version ID from Mojang's version manifest.".into());
     }
 
     let id = Uuid::new_v4().to_string();
