@@ -30,9 +30,6 @@ struct Instance {
 struct Settings {
     ram_gb: u8,
     game_directory: String,
-    loader: String,
-    fabric_loader_version: Option<String>,
-    mod_installed: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +69,9 @@ struct InstallResult {
     libraries_downloaded: usize,
     assets_downloaded: usize,
     game_directory: String,
+    loader: String,
+    fabric_loader_version: Option<String>,
+    mod_installed: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -234,7 +234,7 @@ fn create_instance(app: AppHandle, input: CreateInstanceInput) -> Result<Instanc
 
     let id = Uuid::new_v4().to_string();
     let folder = instances_dir(&app)?.join(&id);
-    fs::create_dir_all(folder.join("mods")).map_err(|error| format!("Could not create mods directory: {error}"))?;
+    fs::create_dir_all(folder.join("game").join("mods")).map_err(|error| format!("Could not create mods directory: {error}"))?;
     fs::create_dir_all(folder.join("config")).map_err(|error| format!("Could not create config directory: {error}"))?;
     let instance = Instance {
         id,
@@ -474,7 +474,7 @@ async fn install_version(app: AppHandle, instance_id: String) -> Result<InstallR
             .map_err(|error| format!("Could not save Fabric instance settings: {error}"))?;
         write_file(&instance_file, &instance_json)?;
 
-        let mods_dir = instances_dir(&app)?.join(&instance.id).join("mods");
+        let mods_dir = instances_dir(&app)?.join(&instance.id).join("game").join("mods");
         fs::create_dir_all(&mods_dir).map_err(|error| format!("Could not create mods folder: {error}"))?;
         let mod_path = mods_dir.join("crescent-client-0.1.0.jar");
         download_file(
