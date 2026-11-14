@@ -5,11 +5,11 @@
   "description": "A premium Minecraft launcher and client by Crescent Studio.",
   "scripts": {
     "dev": "tauri dev",
+    "frontend:dev": "vite --host 127.0.0.1",
+    "build:frontend": "vite build",
     "build": "tauri build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -18,13 +18,9 @@
     "@tauri-apps/api": "^2.8.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8",
-    "electron-vite": "^3.0.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
     "@tauri-apps/cli": "^2.8.0"
