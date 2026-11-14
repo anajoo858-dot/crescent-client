@@ -26,7 +26,8 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "icon": ["icons/icon.ico"],
     "category": "Game",
     "shortDescription": "A modern Minecraft launcher",
     "longDescription": "Crescent Client is a modern Minecraft launcher built with Rust and Tauri."
