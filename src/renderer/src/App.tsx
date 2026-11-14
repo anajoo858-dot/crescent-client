@@ -20,17 +20,27 @@ function App() {
   const [ram, setRam] = useState(4);
   const [notice, setNotice] = useState("Your next adventure starts here.");
   const [instances, setInstances] = useState<CrescentInstance[]>([]);
+  const [releases, setReleases] = useState<string[]>([]);
+  const [javaInfo, setJavaInfo] = useState<CrescentJavaInfo | null>(null);
+  const [installingId, setInstallingId] = useState<string | null>(null);
   const [instanceBusy, setInstanceBusy] = useState(false);
 
   useEffect(() => {
     if (!window.crescent) return;
-    void Promise.all([window.crescent.listInstances(), window.crescent.getSettings(), window.crescent.getVersions()])
-      .then(([savedInstances, settings, manifest]) => {
+    void Promise.all([
+      window.crescent.listInstances(),
+      window.crescent.getSettings(),
+      window.crescent.getVersions(),
+      window.crescent.getJavaInfo()
+    ])
+      .then(([savedInstances, settings, manifest, java]) => {
         setInstances(savedInstances);
         setRam(settings.ramGb);
+        setReleases(manifest.releases);
         setVersion(manifest.latest.release);
+        setJavaInfo(java);
       })
-      .catch(() => setNotice("Some local services could not be loaded. You can still explore the interface."));
+      .catch(() => setNotice("Some local services could not be loaded. Check your connection and try again."));
   }, []);
 
   const createInstance = async () => {
@@ -45,6 +55,20 @@ function App() {
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not create the instance.");
     } finally { setInstanceBusy(false); }
+  };
+
+  const installInstance = async (instance: CrescentInstance) => {
+    if (!window.crescent || installingId) return;
+    setInstallingId(instance.id);
+    setNotice(`Downloading Minecraft ${instance.version}. This may take a while on the first install.`);
+    try {
+      const result = await window.crescent.installVersion(instance.id);
+      setNotice(`Minecraft ${result.version} installed. Downloaded ${result.librariesDownloaded} libraries and ${result.assetsDownloaded} assets.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Minecraft installation failed.");
+    } finally {
+      setInstallingId(null);
+    }
   };
 
   const announce = (message: string) => setNotice(message);
@@ -98,7 +122,7 @@ function App() {
                 <h1>Beyond the<br /><em>Moon.</em></h1>
                 <p>A calmer, cleaner way to experience your worlds.<br />Your journey begins with Crescent.</p>
                 <div className="hero-actions">
-                  <button className="primary-button" onClick={() => announce("Game launching is not available yet. Instance setup is now working locally.")}><Play size={16} fill="currentColor" /> Play Minecraft</button>
+                  <button className="primary-button" onClick={() => setPage("Instances")}><Play size={16} fill="currentColor" /> Manage & install</button>
                   <button className="secondary-button" onClick={() => setPage("Instances")}>Manage instances <ChevronDown size={15} /></button>
                 </div>
               </div>
@@ -115,7 +139,7 @@ function App() {
               <div className="panel version-panel">
                 <div className="panel-top"><div className="panel-icon"><Layers3 size={17} /></div><span>GAME VERSION</span><span className="panel-status">SELECTED</span></div>
                 <label htmlFor="version">Minecraft version</label>
-                <div className="select-wrap"><select id="version" value={version} onChange={e => setVersion(e.target.value)}><option>1.21.4</option><option>1.21.3</option><option>1.20.6</option><option>1.20.4</option><option>1.19.4</option></select><ChevronDown size={15} /></div>
+                <div className="select-wrap"><select id="version" value={version} onChange={e => setVersion(e.target.value)}>{(releases.length ? releases : [version]).map(item => <option key={item} value={item}>{item}</option>)}</select><ChevronDown size={15} /></div>
                 <div className="panel-foot"><span className="tiny-dot" /> Vanilla profile <span className="spacer" /> Change loader in Instances</div>
               </div>
 
@@ -155,6 +179,9 @@ function App() {
                     <div className="panel-icon"><Layers3 size={18} /></div>
                     <div className="instance-info"><strong>{instance.name}</strong><p>Minecraft {instance.version} · Vanilla · Separate mods and config folders</p></div>
                     <span className="panel-status">LOCAL</span>
+                    <button className="secondary-button" disabled={installingId !== null} onClick={() => void installInstance(instance)}>
+                      <Download size={14} /> {installingId === instance.id ? "Installing..." : "Install files"}
+                    </button>
                   </div>
                 ))}
                 <button className="secondary-button" disabled={instanceBusy} onClick={() => void createInstance()}><Plus size={15} /> Create another instance</button>
@@ -180,7 +207,8 @@ function App() {
             <div className="section-kicker">PREFERENCES</div><h1 className="page-title">Settings<span>.</span></h1>
             <p className="page-description">Fine-tune your Crescent experience.</p>
             <div className="panel settings-row"><div className="panel-icon"><Monitor size={18} /></div><div><strong>Appearance</strong><p>Dark lunar theme · Default</p></div><span className="panel-status">ACTIVE</span></div>
-            <div className="panel settings-row"><div className="panel-icon"><Download size={18} /></div><div><strong>Game directory</strong><p>Not configured yet</p></div><span className="muted-label">NOT SET</span></div>
+            <div className="panel settings-row"><div className="panel-icon"><Cpu size={18} /></div><div><strong>Java runtime</strong><p>{javaInfo ? (javaInfo.available ? javaInfo.version : javaInfo.message) : "Checking Java availability..."}</p></div><span className="panel-status">{javaInfo?.available ? "DETECTED" : "CHECK"}</span></div>
+            <div className="panel settings-row"><div className="panel-icon"><Download size={18} /></div><div><strong>Game directory</strong><p>{javaInfo?.executable ? `Java: ${javaInfo.executable}` : "Default game directory is managed by Crescent"}</p></div><span className="muted-label">LOCAL</span></div>
             <div className="panel settings-row"><div className="panel-icon"><SlidersHorizontal size={18} /></div><div><strong>Launcher updates</strong><p>Update delivery will be configured later</p></div><span className="muted-label">PENDING</span></div>
           </div>
         )}
