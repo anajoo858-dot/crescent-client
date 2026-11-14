@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "crescent",
+  "version": "${version}",
+  "name": "Crescent Client",
+  "description": "A modular Minecraft client experience by Crescent Studio.",
+  "authors": ["Crescent Studio"],
+  "contact": {
+    "sources": "https://github.com/anajoo858-dot/crescent-client"
+  },
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["studio.crescent.client.CrescentClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
