@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Home, Layers3, Puzzle, Settings, ChevronDown, Play, Plus, Cpu,
-  HardDrive, Sparkles, Download, Search, X, Monitor, CircleHelp,
-  MoonStar, FolderOpen, CheckCircle2, LoaderCircle, UserRound
+  HardDrive, Sparkles, Download, Search, X, Monitor,
+  MoonStar, FolderOpen, LoaderCircle, UserRound
 } from "lucide-react";
 
 type Page = "Home" | "Instances" | "Mods" | "Settings";
