@@ -641,8 +641,8 @@ fn get_settings(app: AppHandle) -> Result<Settings, String> {
 
 #[tauri::command]
 fn save_settings(app: AppHandle, patch: SettingsPatch) -> Result<Settings, String> {
-    if !(2..=8).contains(&patch.ram_gb) {
-        return Err("RAM allocation must be between 2 and 8 GB.".into());
+    if !(2..=6).contains(&patch.ram_gb) {
+        return Err("RAM allocation must be between 2 and 6 GB.".into());
     }
     let mut settings = read_settings(&app)?;
     settings.ram_gb = patch.ram_gb;
