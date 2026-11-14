@@ -11,6 +11,7 @@ window.crescent = {
   listInstances: () => invoke("list_instances"),
   createInstance: (input) => invoke("create_instance", { input }),
   installVersion: (instanceId) => invoke("install_version", { instanceId }),
+  launchInstance: (instanceId, playerName) => invoke("launch_instance", { input: { instanceId, playerName } }),
   getJavaInfo: () => invoke("get_java_info"),
   getSettings: () => invoke("get_settings"),
   saveSettings: (patch) => invoke("save_settings", { patch })
