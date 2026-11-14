@@ -30,7 +30,7 @@ declare global {
     crescent?: {
       platform: string;
       appVersion: string;
-      getVersions: () => Promise<{ latest: { release: string; snapshot: string }; releases: string[] }>;
+      getVersions: () => Promise<{ latest: { release: string; snapshot: string }; releases: string[]; snapshots: string[]; oldBetas: string[]; oldAlphas: string[] }>;
       listInstances: () => Promise<CrescentInstance[]>;
       createInstance: (input: { name: string; version: string }) => Promise<CrescentInstance>;
       installVersion: (instanceId: string) => Promise<CrescentInstallResult>;
