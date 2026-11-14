@@ -158,6 +158,10 @@ async fn download_file(
     let temporary = destination.with_extension("crescent-download");
     fs::write(&temporary, &bytes)
         .map_err(|error| format!("Could not write download: {error}"))?;
+    if destination.exists() {
+        fs::remove_file(destination)
+            .map_err(|error| format!("Could not replace invalid cached file: {error}"))?;
+    }
     fs::rename(&temporary, destination)
         .map_err(|error| format!("Could not finalize download: {error}"))?;
     Ok(())
