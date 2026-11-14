@@ -6,7 +6,7 @@ import "./styles.css";
 
 window.crescent = {
   platform: "tauri",
-  appVersion: "0.2.0",
+  appVersion: "0.3.0",
   getVersions: () => invoke("get_versions"),
   listInstances: () => invoke("list_instances"),
   createInstance: (input) => invoke("create_instance", { input }),
