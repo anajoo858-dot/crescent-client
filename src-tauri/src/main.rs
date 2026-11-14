@@ -7,9 +7,11 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    io::copy,
 };
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
+use zip::ZipArchive;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -39,6 +41,23 @@ struct CreateInstanceInput {
 #[serde(rename_all = "camelCase")]
 struct SettingsPatch {
     ram_gb: u8,
+}
+
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LaunchInput {
+    instance_id: String,
+    player_name: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LaunchResult {
+    process_id: u32,
+    player_name: String,
+    version: String,
+    authentication: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -327,6 +346,96 @@ async fn install_version(app: AppHandle, instance_id: String) -> Result<InstallR
         assets_downloaded,
         game_directory: root.to_string_lossy().into_owned(),
     })
+}
+
+
+fn current_os_name() -> &'static str {
+    if cfg!(target_os = "windows") { "windows" }
+    else if cfg!(target_os = "macos") { "osx" }
+    else { "linux" }
+}
+
+fn library_allowed(library: &serde_json::Value) -> bool {
+    let Some(rules) = library["rules"].as_array() else { return true; };
+    let mut allowed = false;
+    for rule in rules {
+        let os_matches = rule["os"]["name"].as_str()
+            .map(|name| name == current_os_name()).unwrap_or(true);
+        if os_matches {
+            allowed = rule["action"].as_str() == Some("allow");
+        }
+    }
+    allowed
+}
+
+fn native_classifier_key(library: &serde_json::Value) -> Option<String> {
+    let template = library["natives"][current_os_name()].as_str()?;
+    let arch = if cfg!(target_pointer_width = "64") { "64" } else { "32" };
+    Some(template.replace("\${arch}", arch))
+}
+
+fn extract_natives(archive_path: &Path, destination: &Path) -> Result<(), String> {
+    let file = fs::File::open(archive_path)
+        .map_err(|error| format!("Could not open native library: {error}"))?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|error| format!("Could not read native archive: {error}"))?;
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index)
+            .map_err(|error| format!("Could not read native archive entry: {error}"))?;
+        let Some(relative) = entry.enclosed_name().map(|path| path.to_path_buf()) else { continue; };
+        if relative.components().any(|part| part.as_os_str() == "META-INF") { continue; }
+        let output = destination.join(relative);
+        if let Some(parent) = output.parent() {
+            fs::create_dir_all(parent).map_err(|error| format!("Could not create native folder: {error}"))?;
+        }
+        let mut target = fs::File::create(output)
+            .map_err(|error| format!("Could not extract native library: {error}"))?;
+        copy(&mut entry, &mut target)
+            .map_err(|error| format!("Could not extract native library: {error}"))?;
+    }
+    Ok(())
+}
+
+fn offline_uuid(player_name: &str) -> String {
+    let digest = md5::compute(format!("OfflinePlayer:{player_name}"));
+    let mut bytes = digest.0;
+    bytes[6] = (bytes[6] & 0x0f) | 0x30;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    Uuid::from_bytes(bytes).to_string()
+}
+
+fn expand_argument(value: &str, replacements: &[(String, String)]) -> String {
+    replacements.iter().fold(value.to_owned(), |result, (key, replacement)| {
+        result.replace(&format!("\${{{key}}}"), replacement)
+    })
+}
+
+fn argument_values(value: &serde_json::Value) -> Vec<String> {
+    if let Some(text) = value.as_str() { return vec![text.to_owned()]; }
+    if let Some(values) = value.as_array() {
+        return values.iter().filter_map(|item| item.as_str().map(str::to_owned)).collect();
+    }
+    Vec::new()
+}
+
+fn game_argument_allowed(argument: &serde_json::Value) -> bool {
+    let Some(rules) = argument["rules"].as_array() else { return true; };
+    let mut allowed = false;
+    for rule in rules {
+        let os_matches = rule["os"]["name"].as_str()
+            .map(|name| name == current_os_name()).unwrap_or(true);
+        if os_matches { allowed = rule["action"].as_str() == Some("allow"); }
+    }
+    allowed
+}
+
+fn find_java() -> Option<PathBuf> {
+    let candidate = if let Ok(home) = std::env::var("JAVA_HOME") {
+        PathBuf::from(home).join("bin").join(if cfg!(windows) { "java.exe" } else { "java" })
+    } else {
+        PathBuf::from(if cfg!(windows) { "java.exe" } else { "java" })
+    };
+    if Command::new(&candidate).arg("-version").output().is_ok() { Some(candidate) } else { None }
 }
 
 #[tauri::command]
