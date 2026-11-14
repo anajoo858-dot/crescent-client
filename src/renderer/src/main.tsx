@@ -4,15 +4,16 @@ import { invoke } from "@tauri-apps/api/core";
 import App from "./App";
 import "./styles.css";
 
-// Preserve the renderer API while routing all desktop operations through Rust.
 window.crescent = {
   platform: "tauri",
   appVersion: "0.2.0",
-  getVersions: () => invoke<{ latest: { release: string; snapshot: string }; releases: string[] }>("get_versions"),
-  listInstances: () => invoke<CrescentInstance[]>("list_instances"),
-  createInstance: (input) => invoke<CrescentInstance>("create_instance", { input }),
-  getSettings: () => invoke<{ ramGb: number; gameDirectory: string }>("get_settings"),
-  saveSettings: (patch) => invoke<{ ramGb: number; gameDirectory: string }>("save_settings", { patch })
+  getVersions: () => invoke("get_versions"),
+  listInstances: () => invoke("list_instances"),
+  createInstance: (input) => invoke("create_instance", { input }),
+  installVersion: (instanceId) => invoke("install_version", { instanceId }),
+  getJavaInfo: () => invoke("get_java_info"),
+  getSettings: () => invoke("get_settings"),
+  saveSettings: (patch) => invoke("save_settings", { patch })
 };
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
