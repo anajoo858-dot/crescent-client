@@ -20,6 +20,8 @@ struct Instance {
     name: String,
     version: String,
     loader: String,
+    #[serde(default)]
+    loader_version: Option<String>,
     created_at: String,
 }
 
@@ -28,6 +30,9 @@ struct Instance {
 struct Settings {
     ram_gb: u8,
     game_directory: String,
+    loader: String,
+    fabric_loader_version: Option<String>,
+    mod_installed: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -235,7 +240,8 @@ fn create_instance(app: AppHandle, input: CreateInstanceInput) -> Result<Instanc
         id,
         name: name.to_owned(),
         version: version.to_owned(),
-        loader: "vanilla".into(),
+        loader: if version == "26.3" { "fabric".into() } else { "vanilla".into() },
+        loader_version: None,
         created_at: chrono_free_timestamp(),
     };
     let metadata = serde_json::to_string_pretty(&instance)
@@ -256,9 +262,90 @@ fn chrono_free_timestamp() -> String {
         .unwrap_or_default().as_secs().to_string()
 }
 
+
+async fn install_fabric_loader(
+    client: &reqwest::Client,
+    java: &Path,
+    game_root: &Path,
+    minecraft_version: &str,
+) -> Result<String, String> {
+    let loaders_response = client
+        .get(format!("https://meta.fabricmc.net/v2/versions/loader/{minecraft_version}"))
+        .send().await.map_err(|error| format!("Could not fetch Fabric Loader versions: {error}"))?;
+    if !loaders_response.status().is_success() {
+        return Err(format!("Fabric metadata returned HTTP {}", loaders_response.status()));
+    }
+    let loaders: serde_json::Value = loaders_response.json().await
+        .map_err(|error| format!("Could not parse Fabric Loader versions: {error}"))?;
+    let loader_version = loaders.as_array()
+        .and_then(|items| items.iter().find(|item| item["loader"]["stable"].as_bool() == Some(true)).or_else(|| items.first()))
+        .and_then(|item| item["loader"]["version"].as_str())
+        .ok_or("No Fabric Loader version is available for this Minecraft release")?
+        .to_owned();
+
+    let installers_response = client.get("https://meta.fabricmc.net/v2/versions/installer")
+        .send().await.map_err(|error| format!("Could not fetch Fabric Installer versions: {error}"))?;
+    if !installers_response.status().is_success() {
+        return Err(format!("Fabric Installer metadata returned HTTP {}", installers_response.status()));
+    }
+    let installers: serde_json::Value = installers_response.json().await
+        .map_err(|error| format!("Could not parse Fabric Installer versions: {error}"))?;
+    let installer_version = installers.as_array()
+        .and_then(|items| items.iter().find(|item| item["stable"].as_bool() == Some(true)).or_else(|| items.first()))
+        .and_then(|item| item["version"].as_str())
+        .ok_or("No Fabric Installer version is available")?
+        .to_owned();
+
+    let installer_path = game_root.join("libraries")
+        .join("net/fabricmc/fabric-installer")
+        .join(&installer_version)
+        .join(format!("fabric-installer-{installer_version}.jar"));
+    let installer_url = format!(
+        "https://maven.fabricmc.net/net/fabricmc/fabric-installer/{installer_version}/fabric-installer-{installer_version}.jar"
+    );
+    download_file(client, &installer_url, &installer_path, None).await?;
+
+    let output = Command::new(java)
+        .arg("-jar")
+        .arg(&installer_path)
+        .arg("client")
+        .arg("-dir")
+        .arg(game_root)
+        .arg("-mcversion")
+        .arg(minecraft_version)
+        .arg("-loader")
+        .arg(&loader_version)
+        .current_dir(game_root)
+        .output()
+        .map_err(|error| format!("Could not start Fabric Installer: {error}"))?;
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Fabric Loader installation failed. {stdout} {stderr}"));
+    }
+
+    let profile_id = format!("fabric-loader-{loader_version}-{minecraft_version}");
+    let profile_path = game_root.join("versions").join(&profile_id).join(format!("{profile_id}.json"));
+    if !profile_path.exists() {
+        return Err("Fabric Installer finished but did not create its launch profile.".into());
+    }
+    Ok(loader_version)
+}
+
+fn maven_artifact_path(coordinate: &str) -> Option<String> {
+    let (coordinate, extension) = coordinate.split_once('@').unwrap_or((coordinate, "jar"));
+    let parts: Vec<&str> = coordinate.split(':').collect();
+    if parts.len() < 3 { return None; }
+    let group = parts[0].replace('.', "/");
+    let artifact = parts[1];
+    let version = parts[2];
+    let classifier = parts.get(3).map(|value| format!("-{value}")).unwrap_or_default();
+    Some(format!("{group}/{artifact}/{version}/{artifact}-{version}{classifier}.{extension}"))
+}
+
 #[tauri::command]
 async fn install_version(app: AppHandle, instance_id: String) -> Result<InstallResult, String> {
-    let instance = list_instances(app.clone())?.into_iter()
+    let mut instance = list_instances(app.clone())?.into_iter()
         .find(|item| item.id == instance_id)
         .ok_or("Instance was not found")?;
     let client = reqwest::Client::builder().user_agent("CrescentClient/0.2.0").build()
@@ -375,11 +462,39 @@ async fn install_version(app: AppHandle, instance_id: String) -> Result<InstallR
             .try_collect::<Vec<_>>().await?;
     }
 
+    let mut fabric_loader_version = None;
+    let mut mod_installed = false;
+    if instance.version == "26.3" {
+        let java = find_java().ok_or("Java is required to install Fabric Loader. Install Java 25 and try again.")?;
+        let loader_version = install_fabric_loader(&client, &java, &root, &instance.version).await?;
+        instance.loader = "fabric".into();
+        instance.loader_version = Some(loader_version.clone());
+        let instance_file = instances_dir(&app)?.join(&instance.id).join("instance.json");
+        let instance_json = serde_json::to_string_pretty(&instance)
+            .map_err(|error| format!("Could not save Fabric instance settings: {error}"))?;
+        write_file(&instance_file, &instance_json)?;
+
+        let mods_dir = instances_dir(&app)?.join(&instance.id).join("mods");
+        fs::create_dir_all(&mods_dir).map_err(|error| format!("Could not create mods folder: {error}"))?;
+        let mod_path = mods_dir.join("crescent-client-0.1.0.jar");
+        download_file(
+            &client,
+            "https://github.com/anajoo858-dot/crescent-client/releases/download/crescent-26.3/crescent-client-0.1.0.jar",
+            &mod_path,
+            None,
+        ).await?;
+        fabric_loader_version = Some(loader_version);
+        mod_installed = true;
+    }
+
     Ok(InstallResult {
         version: instance.version,
         libraries_downloaded,
         assets_downloaded,
         game_directory: root.to_string_lossy().into_owned(),
+        loader: instance.loader,
+        fabric_loader_version,
+        mod_installed,
     })
 }
 
@@ -512,6 +627,18 @@ fn launch_instance(app: AppHandle, input: LaunchInput) -> Result<LaunchResult, S
     let metadata: serde_json::Value = serde_json::from_slice(
         &fs::read(&metadata_path).map_err(|error| format!("Could not read version metadata: {error}"))?
     ).map_err(|error| format!("Invalid version metadata: {error}"))?;
+    let fabric_profile = if instance.loader == "fabric" {
+        let loader_version = instance.loader_version.as_deref()
+            .ok_or("Fabric Loader has not been installed for this instance. Install the game files first.")?;
+        let profile_id = format!("fabric-loader-{loader_version}-{}", instance.version);
+        let profile_path = root.join("versions").join(&profile_id).join(format!("{profile_id}.json"));
+        let profile_bytes = fs::read(&profile_path)
+            .map_err(|_| "Fabric launch profile is missing. Reinstall this instance's game files.")?;
+        Some(serde_json::from_slice::<serde_json::Value>(&profile_bytes)
+            .map_err(|error| format!("Invalid Fabric launch profile: {error}"))?)
+    } else {
+        None
+    };
     if let Some(required) = metadata["javaVersion"]["majorVersion"].as_u64() {
         if let Some(installed) = java_major_version(&java) {
             if installed < required as u32 {
@@ -533,6 +660,20 @@ fn launch_instance(app: AppHandle, input: LaunchInput) -> Result<LaunchResult, S
             if let Some(path) = library["downloads"]["artifact"]["path"].as_str() {
                 let full_path = root.join("libraries").join(path);
                 if full_path.exists() { classpath.push(full_path.to_string_lossy().into_owned()); }
+            }
+        }
+    }
+    if let Some(profile) = fabric_profile.as_ref() {
+        if let Some(libraries) = profile["libraries"].as_array() {
+            for library in libraries {
+                if !library_allowed(library) { continue; }
+                let relative = library["downloads"]["artifact"]["path"].as_str()
+                    .map(str::to_owned)
+                    .or_else(|| library["name"].as_str().and_then(maven_artifact_path));
+                if let Some(relative) = relative {
+                    let path = root.join("libraries").join(relative);
+                    if path.exists() { classpath.push(path.to_string_lossy().into_owned()); }
+                }
             }
         }
     }
@@ -575,6 +716,17 @@ fn launch_instance(app: AppHandle, input: LaunchInput) -> Result<LaunchResult, S
             }
         }
     }
+    if let Some(jvm_args) = fabric_profile.as_ref().and_then(|profile| profile["arguments"]["jvm"].as_array()) {
+        for argument in jvm_args {
+            if argument.is_object() {
+                if game_argument_allowed(argument) {
+                    args.extend(argument_values(&argument["value"]));
+                }
+            } else {
+                args.extend(argument_values(argument));
+            }
+        }
+    }
     args = args.into_iter().map(|arg| expand_argument(&arg, &replacements)).collect();
 
     let mut game_args: Vec<String> = Vec::new();
@@ -593,6 +745,17 @@ fn launch_instance(app: AppHandle, input: LaunchInput) -> Result<LaunchResult, S
     } else {
         return Err("This Minecraft version uses an unsupported launch argument format.".into());
     }
+    if let Some(profile_args) = fabric_profile.as_ref().and_then(|profile| profile["arguments"]["game"].as_array()) {
+        for argument in profile_args {
+            if argument.is_object() {
+                if game_argument_allowed(argument) {
+                    game_args.extend(argument_values(&argument["value"]));
+                }
+            } else {
+                game_args.extend(argument_values(argument));
+            }
+        }
+    }
     game_args = game_args.into_iter().map(|arg| expand_argument(&arg, &replacements)).collect();
 
     let has_classpath = args.iter().any(|arg| arg == "-cp" || arg == "-classpath" || arg == "--class-path");
@@ -600,7 +763,10 @@ fn launch_instance(app: AppHandle, input: LaunchInput) -> Result<LaunchResult, S
         args.push("-cp".into());
         args.push(classpath);
     }
-    let main_class = metadata["mainClass"].as_str().ok_or("Minecraft main class is missing")?;
+    let main_class = fabric_profile.as_ref()
+        .and_then(|profile| profile["mainClass"].as_str())
+        .or_else(|| metadata["mainClass"].as_str())
+        .ok_or("Minecraft main class is missing")?;
     args.push(main_class.into());
     args.extend(game_args);
 
