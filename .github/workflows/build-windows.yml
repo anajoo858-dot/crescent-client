@@ -94,7 +94,7 @@ jobs:
           tag_name: crescent-26.3
           name: Crescent Client Mod for Minecraft 26.3
           body: Automated Crescent Fabric mod build for Minecraft 26.3.
-          files: build/libs/crescent-client-0.1.0.jar
+          files: crescent-fabric/build/libs/crescent-client-0.1.0.jar
           overwrite_files: true
           prerelease: true
           make_latest: false
