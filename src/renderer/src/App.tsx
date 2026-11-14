@@ -20,7 +20,7 @@ function App() {
   const [ram, setRam] = useState(4);
   const [notice, setNotice] = useState("Your next adventure starts here.");
   const [instances, setInstances] = useState<CrescentInstance[]>([]);
-  const [releases, setReleases] = useState<string[]>([]);
+  const [versionGroups, setVersionGroups] = useState<{ releases: string[]; snapshots: string[]; oldBetas: string[]; oldAlphas: string[] }>({ releases: [], snapshots: [], oldBetas: [], oldAlphas: [] });
   const [javaInfo, setJavaInfo] = useState<CrescentJavaInfo | null>(null);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [instanceBusy, setInstanceBusy] = useState(false);
@@ -36,7 +36,7 @@ function App() {
       .then(([savedInstances, settings, manifest, java]) => {
         setInstances(savedInstances);
         setRam(settings.ramGb);
-        setReleases(manifest.releases);
+        setVersionGroups({ releases: manifest.releases, snapshots: manifest.snapshots, oldBetas: manifest.oldBetas, oldAlphas: manifest.oldAlphas });
         setVersion(manifest.latest.release);
         setJavaInfo(java);
       })
@@ -152,7 +152,13 @@ function App() {
               <div className="panel version-panel">
                 <div className="panel-top"><div className="panel-icon"><Layers3 size={17} /></div><span>GAME VERSION</span><span className="panel-status">SELECTED</span></div>
                 <label htmlFor="version">Minecraft version</label>
-                <div className="select-wrap"><select id="version" value={version} onChange={e => setVersion(e.target.value)}>{(releases.length ? releases : [version]).map(item => <option key={item} value={item}>{item}</option>)}</select><ChevronDown size={15} /></div>
+                <div className="select-wrap"><select id="version" value={version} onChange={e => setVersion(e.target.value)}>
+                  {versionGroups.releases.length > 0 && <optgroup label="Releases">{versionGroups.releases.map(item => <option key={item} value={item}>{item}</option>)}</optgroup>}
+                  {versionGroups.snapshots.length > 0 && <optgroup label="Snapshots">{versionGroups.snapshots.map(item => <option key={item} value={item}>{item}</option>)}</optgroup>}
+                  {versionGroups.oldBetas.length > 0 && <optgroup label="Old Beta">{versionGroups.oldBetas.map(item => <option key={item} value={item}>{item}</option>)}</optgroup>}
+                  {versionGroups.oldAlphas.length > 0 && <optgroup label="Old Alpha">{versionGroups.oldAlphas.map(item => <option key={item} value={item}>{item}</option>)}</optgroup>}
+                  {!versionGroups.releases.length && !versionGroups.snapshots.length && !versionGroups.oldBetas.length && !versionGroups.oldAlphas.length && <option value={version}>{version}</option>}
+                </select><ChevronDown size={15} /></div>
                 <div className="panel-foot"><span className="tiny-dot" /> Vanilla profile <span className="spacer" /> Change loader in Instances</div>
               </div>
 
