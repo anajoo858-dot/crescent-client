@@ -3,18 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "description": "A premium Minecraft launcher and client by Crescent Studio.",
-  "main": "out/main/main.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "preview": "electron-vite preview",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "dist:win": "npm run build && electron-builder --win nsis --publish never"
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "@tauri-apps/api": "^2.8.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
@@ -25,19 +26,7 @@
     "electron-builder": "^25.1.8",
     "electron-vite": "^3.0.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.5"
-  },
-  "build": {
-    "appId": "studio.x3m.crescent",
-    "productName": "Crescent Client",
-    "directories": { "output": "release" },
-    "files": ["out/**/*", "package.json"],
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }] },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    }
+    "vite": "^6.0.5",
+    "@tauri-apps/cli": "^2.8.0"
   }
 }
