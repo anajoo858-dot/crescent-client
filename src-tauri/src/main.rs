@@ -287,8 +287,10 @@ async fn install_version(app: AppHandle, instance_id: String) -> Result<InstallR
     download_file(&client, client_url, &client_path, client_hash).await?;
 
     let mut library_tasks: Vec<(String, PathBuf, Option<String>)> = Vec::new();
+    let mut native_jars: Vec<PathBuf> = Vec::new();
     if let Some(libraries) = metadata["libraries"].as_array() {
         for library in libraries {
+            if !library_allowed(library) { continue; }
             if let Some(artifact) = library["downloads"]["artifact"].as_object() {
                 if let (Some(url), Some(path)) = (artifact.get("url").and_then(|v| v.as_str()), artifact.get("path").and_then(|v| v.as_str())) {
                     library_tasks.push((
@@ -296,6 +298,21 @@ async fn install_version(app: AppHandle, instance_id: String) -> Result<InstallR
                         root.join("libraries").join(path),
                         artifact.get("sha1").and_then(|v| v.as_str()).map(str::to_owned)
                     ));
+                }
+            }
+            if let Some(classifiers) = library["downloads"]["classifiers"].as_object() {
+                if let Some(key) = native_classifier_key(library) {
+                    if let Some(native) = classifiers.get(&key) {
+                        if let (Some(url), Some(path)) = (native["url"].as_str(), native["path"].as_str()) {
+                            let native_path = root.join("libraries").join(path);
+                            native_jars.push(native_path.clone());
+                            library_tasks.push((
+                                url.to_owned(),
+                                native_path,
+                                native["sha1"].as_str().map(str::to_owned)
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -308,6 +325,12 @@ async fn install_version(app: AppHandle, instance_id: String) -> Result<InstallR
         })
         .buffer_unordered(10)
         .try_collect::<Vec<_>>().await?;
+
+    let natives_dir = version_dir.join(format!("{}-natives", instance.version));
+    fs::create_dir_all(&natives_dir).map_err(|error| format!("Could not create natives folder: {error}"))?;
+    for native_jar in &native_jars {
+        extract_natives(native_jar, &natives_dir)?;
+    }
 
     let mut assets_downloaded = 0usize;
     if let Some(asset_index) = metadata["assetIndex"].as_object() {
