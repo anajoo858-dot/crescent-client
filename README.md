@@ -1,44 +1,42 @@
 # Crescent Client
 
-A premium, dark lunar-themed Minecraft launcher foundation built with Electron, React, TypeScript, and Vite.
+Crescent Client is migrating to a **Rust + Tauri 2** desktop architecture while keeping its existing React + TypeScript Liquid Glass interface.
 
-## Current status
+## Architecture
 
-This repository is an early development build. The current milestone includes:
-- Electron desktop shell with context isolation and a restricted preload bridge.
-- Dark silver Crescent interface with Home, Instances, Mods, and Settings sections.
-- Local Vanilla instance metadata creation with separate `mods` and `config` directories.
-- Minecraft release list retrieval from Mojang's public version manifest.
-- Local RAM preference persistence.
-- Windows NSIS installer workflow through GitHub Actions.
+- **Rust + Tauri 2** — desktop runtime, filesystem access, Minecraft metadata requests, local instances, and settings.
+- **React + TypeScript** — presentation layer only.
+- **Supabase** — planned cloud profiles and cape services. The client must only use a publishable key; privileged operations belong in Edge Functions.
+- **Ely.by** — planned account integration through its supported authentication flow. No Ely.by client secret or player password may be embedded in the desktop app.
 
-Not implemented yet:
-- Minecraft asset, library, and client downloads.
-- Microsoft account authentication and token refresh.
-- Java runtime detection/management and actual game launching.
-- Fabric, Forge, NeoForge, and OptiFine installation.
-- Mod discovery, updates, and in-game HUD features.
-- Online accounts, skins, capes, or cloud synchronization.
+## Current migration milestone
 
-Do not treat the current UI as a finished Minecraft launcher. These features need implementation, testing, and security review.
+- Tauri 2 project scaffold and Rust command layer.
+- Existing React interface retained.
+- Minecraft release manifest fetched by Rust.
+- Local instance metadata and settings managed by Rust.
+- Electron is no longer used by the development/build scripts.
+
+Not yet implemented: game downloads and launching, Microsoft authentication, Ely.by authentication, Supabase account linking, cape storage, and cape ownership workflows. These are separate milestones and are not represented as working features yet.
+
+## Requirements
+
+- Node.js 20+
+- Rust stable toolchain
+- Tauri 2 system prerequisites for your operating system (Windows WebView2 on Windows; GTK/WebKitGTK development packages on Linux).
 
 ## Development
-
-Requirements: Node.js 20+ and npm.
 
 ```bash
 npm install
 npm run dev
+```
+
+## Checks and production build
+
+```bash
 npm run typecheck
 npm run build
 ```
 
-## Windows installer
-
-Push to `main` or manually run the **Build Windows Installer** workflow in GitHub Actions. The workflow builds an x64 NSIS installer and uploads it as a workflow artifact.
-
-## Project structure
-
-- `electron/` - Electron main process and secure preload bridge.
-- `src/renderer/` - React interface.
-- `.github/workflows/` - CI and Windows packaging.
+The Tauri build creates native desktop bundles for the target platform. Install the platform prerequisites before building.
