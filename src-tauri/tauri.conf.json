@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "identifier": "studio.x3m.crescent",
   "build": {
-    "beforeDevCommand": "npm run dev -- --host 127.0.0.1",
+    "beforeDevCommand": "npm run frontend:dev",
     "devUrl": "http://127.0.0.1:1420",
     "beforeBuildCommand": "npm run build:frontend",
     "frontendDist": "../dist"
