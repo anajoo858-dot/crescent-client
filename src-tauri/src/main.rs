@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     io::copy,
+    process::Stdio,
 };
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
@@ -461,6 +462,133 @@ fn find_java() -> Option<PathBuf> {
     if Command::new(&candidate).arg("-version").output().is_ok() { Some(candidate) } else { None }
 }
 
+
+#[tauri::command]
+fn launch_instance(app: AppHandle, input: LaunchInput) -> Result<LaunchResult, String> {
+    let player_name = input.player_name.trim();
+    if player_name.is_empty() || player_name.chars().count() > 16
+        || !player_name.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
+        return Err("Enter a Minecraft username using 1–16 letters, numbers, or underscores.".into());
+    }
+    let java = find_java().ok_or("Java was not found. Install the Java version required by this Minecraft release.")?;
+    let instance = list_instances(app.clone())?.into_iter()
+        .find(|item| item.id == input.instance_id).ok_or("Instance was not found")?;
+    let root = game_root(&app)?;
+    let version_dir = root.join("versions").join(&instance.version);
+    let metadata_path = version_dir.join(format!("{}.json", instance.version));
+    let client_jar = version_dir.join(format!("{}.jar", instance.version));
+    if !metadata_path.exists() || !client_jar.exists() {
+        return Err("This instance is not installed yet. Install its game files first.".into());
+    }
+    let metadata: serde_json::Value = serde_json::from_slice(
+        &fs::read(&metadata_path).map_err(|error| format!("Could not read version metadata: {error}"))?
+    ).map_err(|error| format!("Invalid version metadata: {error}"))?;
+
+    let instance_dir = instances_dir(&app)?.join(&instance.id).join("game");
+    fs::create_dir_all(&instance_dir).map_err(|error| format!("Could not create instance game folder: {error}"))?;
+    let assets_dir = root.join("assets");
+    let asset_index = metadata["assetIndex"]["id"].as_str().unwrap_or(&instance.version);
+    let natives_dir = version_dir.join(format!("{}-natives", instance.version));
+
+    let mut classpath: Vec<String> = Vec::new();
+    if let Some(libraries) = metadata["libraries"].as_array() {
+        for library in libraries {
+            if !library_allowed(library) { continue; }
+            if let Some(path) = library["downloads"]["artifact"]["path"].as_str() {
+                let full_path = root.join("libraries").join(path);
+                if full_path.exists() { classpath.push(full_path.to_string_lossy().into_owned()); }
+            }
+        }
+    }
+    classpath.push(client_jar.to_string_lossy().into_owned());
+    let separator = if cfg!(windows) { ";" } else { ":" };
+    let classpath = classpath.join(separator);
+    let uuid = offline_uuid(player_name);
+    let settings = read_settings(&app)?;
+    let replacements = vec![
+        ("auth_player_name".to_owned(), player_name.to_owned()),
+        ("version_name".to_owned(), instance.version.clone()),
+        ("game_directory".to_owned(), instance_dir.to_string_lossy().into_owned()),
+        ("assets_root".to_owned(), assets_dir.to_string_lossy().into_owned()),
+        ("assets_index_name".to_owned(), asset_index.to_owned()),
+        ("auth_uuid".to_owned(), uuid),
+        ("auth_access_token".to_owned(), "0".to_owned()),
+        ("user_type".to_owned(), "legacy".to_owned()),
+        ("version_type".to_owned(), "release".to_owned()),
+        ("natives_directory".to_owned(), natives_dir.to_string_lossy().into_owned()),
+        ("launcher_name".to_owned(), "Crescent".to_owned()),
+        ("launcher_version".to_owned(), "0.2.0".to_owned()),
+        ("classpath".to_owned(), classpath.clone()),
+        ("classpath_separator".to_owned(), separator.to_owned()),
+        ("library_directory".to_owned(), root.join("libraries").to_string_lossy().into_owned()),
+    ];
+
+    let mut args: Vec<String> = vec![
+        "-Xms512M".into(),
+        format!("-Xmx{}G", settings.ram_gb),
+        format!("-Djava.library.path={}", natives_dir.to_string_lossy()),
+    ];
+    if let Some(jvm_args) = metadata["arguments"]["jvm"].as_array() {
+        for argument in jvm_args {
+            if argument.is_object() {
+                if game_argument_allowed(argument) {
+                    args.extend(argument_values(&argument["value"]));
+                }
+            } else {
+                args.extend(argument_values(argument));
+            }
+        }
+    }
+    args = args.into_iter().map(|arg| expand_argument(&arg, &replacements)).collect();
+
+    let mut game_args: Vec<String> = Vec::new();
+    if let Some(arguments) = metadata["arguments"]["game"].as_array() {
+        for argument in arguments {
+            if argument.is_object() {
+                if game_argument_allowed(argument) {
+                    game_args.extend(argument_values(&argument["value"]));
+                }
+            } else {
+                game_args.extend(argument_values(argument));
+            }
+        }
+    } else if let Some(legacy) = metadata["minecraftArguments"].as_str() {
+        game_args.extend(legacy.split_whitespace().map(str::to_owned));
+    } else {
+        return Err("This Minecraft version uses an unsupported launch argument format.".into());
+    }
+    game_args = game_args.into_iter().map(|arg| expand_argument(&arg, &replacements)).collect();
+
+    let has_classpath = args.iter().any(|arg| arg == "-cp" || arg == "-classpath" || arg == "--class-path");
+    if !has_classpath {
+        args.push("-cp".into());
+        args.push(classpath);
+    }
+    let main_class = metadata["mainClass"].as_str().ok_or("Minecraft main class is missing")?;
+    args.push(main_class.into());
+    args.extend(game_args);
+
+    fs::create_dir_all(instance_dir.join("logs")).map_err(|error| format!("Could not create logs folder: {error}"))?;
+    let log_file = fs::OpenOptions::new().create(true).append(true)
+        .open(instance_dir.join("logs").join("latest-crescent.log"))
+        .map_err(|error| format!("Could not open game log: {error}"))?;
+    let error_log = log_file.try_clone().map_err(|error| format!("Could not open error log: {error}"))?;
+    let child = Command::new(&java)
+        .args(&args)
+        .current_dir(&instance_dir)
+        .stdout(Stdio::from(log_file))
+        .stderr(Stdio::from(error_log))
+        .spawn()
+        .map_err(|error| format!("Could not start Minecraft with Java: {error}"))?;
+
+    Ok(LaunchResult {
+        process_id: child.id(),
+        player_name: player_name.to_owned(),
+        version: instance.version,
+        authentication: "Offline profile: only compatible with servers configured to allow offline-mode accounts.".into(),
+    })
+}
+
 #[tauri::command]
 fn get_java_info() -> JavaInfo {
     let candidates = {
@@ -519,6 +647,7 @@ fn main() {
             list_instances,
             create_instance,
             install_version,
+            launch_instance,
             get_java_info,
             get_settings,
             save_settings
