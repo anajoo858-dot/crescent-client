@@ -5,7 +5,8 @@ declare global {
     id: string;
     name: string;
     version: string;
-    loader: "vanilla";
+    loader: "vanilla" | "fabric";
+    loaderVersion: string | null;
     createdAt: string;
   };
   type CrescentInstallResult = {
@@ -13,6 +14,9 @@ declare global {
     librariesDownloaded: number;
     assetsDownloaded: number;
     gameDirectory: string;
+    loader: string;
+    fabricLoaderVersion: string | null;
+    modInstalled: boolean;
   };
   type CrescentLaunchResult = {
     processId: number;
