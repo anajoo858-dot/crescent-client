@@ -383,13 +383,19 @@ fn current_os_name() -> &'static str {
     else { "linux" }
 }
 
+fn feature_conditions_match(rule: &serde_json::Value) -> bool {
+    rule["features"].as_object().map(|features| {
+        features.values().all(|value| value.as_bool() == Some(false))
+    }).unwrap_or(true)
+}
+
 fn library_allowed(library: &serde_json::Value) -> bool {
     let Some(rules) = library["rules"].as_array() else { return true; };
     let mut allowed = false;
     for rule in rules {
         let os_matches = rule["os"]["name"].as_str()
             .map(|name| name == current_os_name()).unwrap_or(true);
-        if os_matches {
+        if os_matches && feature_conditions_match(rule) {
             allowed = rule["action"].as_str() == Some("allow");
         }
     }
@@ -452,7 +458,9 @@ fn game_argument_allowed(argument: &serde_json::Value) -> bool {
     for rule in rules {
         let os_matches = rule["os"]["name"].as_str()
             .map(|name| name == current_os_name()).unwrap_or(true);
-        if os_matches { allowed = rule["action"].as_str() == Some("allow"); }
+        if os_matches && feature_conditions_match(rule) {
+            allowed = rule["action"].as_str() == Some("allow");
+        }
     }
     allowed
 }
