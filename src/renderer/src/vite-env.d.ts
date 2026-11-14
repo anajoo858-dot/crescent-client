@@ -14,6 +14,12 @@ declare global {
     assetsDownloaded: number;
     gameDirectory: string;
   };
+  type CrescentLaunchResult = {
+    processId: number;
+    playerName: string;
+    version: string;
+    authentication: string;
+  };
   type CrescentJavaInfo = {
     available: boolean;
     version: string | null;
@@ -28,6 +34,7 @@ declare global {
       listInstances: () => Promise<CrescentInstance[]>;
       createInstance: (input: { name: string; version: string }) => Promise<CrescentInstance>;
       installVersion: (instanceId: string) => Promise<CrescentInstallResult>;
+      launchInstance: (instanceId: string, playerName: string) => Promise<CrescentLaunchResult>;
       getJavaInfo: () => Promise<CrescentJavaInfo>;
       getSettings: () => Promise<{ ramGb: number; gameDirectory: string }>;
       saveSettings: (patch: { ramGb: number }) => Promise<{ ramGb: number; gameDirectory: string }>;
