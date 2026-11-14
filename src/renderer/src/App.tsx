@@ -76,7 +76,10 @@ function App() {
     setNotice(`Downloading Minecraft ${instance.version}. This may take a while on the first install.`);
     try {
       const result = await window.crescent.installVersion(instance.id);
-      setNotice(`Minecraft ${result.version} installed. Downloaded ${result.librariesDownloaded} libraries and ${result.assetsDownloaded} assets.`);
+      const clientStatus = result.modInstalled
+        ? ` Fabric ${result.fabricLoaderVersion} installed and Crescent added to the mods folder.`
+        : " Vanilla installation complete.";
+      setNotice(`Minecraft ${result.version} installed. Downloaded ${result.librariesDownloaded} libraries and ${result.assetsDownloaded} assets.${clientStatus}`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Minecraft installation failed.");
     } finally {
@@ -188,7 +191,7 @@ function App() {
             {instances.length === 0 ? (
               <div className="empty-state panel">
                 <div className="empty-icon"><Layers3 size={26} /></div><h2>No instances yet</h2>
-                <p>Create a separate local Vanilla profile. Fabric and Forge support will come in a later milestone.</p>
+                <p>Create a separate local profile. Minecraft 26.3 automatically installs Fabric Loader and Crescent Client.</p>
                 <button className="primary-button" disabled={instanceBusy} onClick={() => void createInstance()}><Plus size={16} /> {instanceBusy ? "Creating..." : "Create instance"}</button>
               </div>
             ) : (
@@ -196,7 +199,7 @@ function App() {
                 {instances.map(instance => (
                   <div className="panel instance-card" key={instance.id}>
                     <div className="panel-icon"><Layers3 size={18} /></div>
-                    <div className="instance-info"><strong>{instance.name}</strong><p>Minecraft {instance.version} · Vanilla · Separate mods and config folders</p></div>
+                    <div className="instance-info"><strong>{instance.name}</strong><p>Minecraft {instance.version} · {instance.loader === "fabric" ? `Fabric ${instance.loaderVersion ?? ""}` : "Vanilla"} · Separate mods and config folders</p></div>
                     <span className="panel-status">LOCAL</span>
                     <div className="instance-actions">
                       <button className="secondary-button" disabled={installingId !== null} onClick={() => void installInstance(instance)}>
