@@ -6,9 +6,8 @@ use sha1::{Digest, Sha1};
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
     io::copy,
-    process::Stdio,
+    process::{Command, Stdio},
 };
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
