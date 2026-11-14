@@ -466,12 +466,22 @@ fn game_argument_allowed(argument: &serde_json::Value) -> bool {
 }
 
 fn find_java() -> Option<PathBuf> {
-    let candidate = if let Ok(home) = std::env::var("JAVA_HOME") {
-        PathBuf::from(home).join("bin").join(if cfg!(windows) { "java.exe" } else { "java" })
-    } else {
-        PathBuf::from(if cfg!(windows) { "java.exe" } else { "java" })
-    };
-    if Command::new(&candidate).arg("-version").output().is_ok() { Some(candidate) } else { None }
+    let mut candidates = vec![PathBuf::from(if cfg!(windows) { "java.exe" } else { "java" })];
+    if let Ok(home) = std::env::var("JAVA_HOME") {
+        candidates.insert(0, PathBuf::from(home).join("bin").join(if cfg!(windows) { "java.exe" } else { "java" }));
+    }
+    candidates.into_iter().find(|candidate| Command::new(candidate).arg("-version").output().is_ok())
+}
+
+fn java_major_version(java: &Path) -> Option<u32> {
+    let output = Command::new(java).arg("-version").output().ok()?;
+    let text = String::from_utf8_lossy(&output.stderr).to_string()
+        + &String::from_utf8_lossy(&output.stdout);
+    let line = text.lines().find(|line| line.contains("version"))?;
+    let quoted = line.split('"').nth(1)?;
+    let mut parts = quoted.split('.');
+    let first = parts.next()?.parse::<u32>().ok()?;
+    if first == 1 { parts.next()?.parse::<u32>().ok() } else { Some(first) }
 }
 
 
@@ -495,6 +505,13 @@ fn launch_instance(app: AppHandle, input: LaunchInput) -> Result<LaunchResult, S
     let metadata: serde_json::Value = serde_json::from_slice(
         &fs::read(&metadata_path).map_err(|error| format!("Could not read version metadata: {error}"))?
     ).map_err(|error| format!("Invalid version metadata: {error}"))?;
+    if let Some(required) = metadata["javaVersion"]["majorVersion"].as_u64() {
+        if let Some(installed) = java_major_version(&java) {
+            if installed < required as u32 {
+                return Err(format!("Minecraft {} requires Java {}, but the selected Java runtime is {}. Install a newer Java runtime and retry.", instance.version, required, installed));
+            }
+        }
+    }
 
     let instance_dir = instances_dir(&app)?.join(&instance.id).join("game");
     fs::create_dir_all(&instance_dir).map_err(|error| format!("Could not create instance game folder: {error}"))?;
