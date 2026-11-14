@@ -399,7 +399,7 @@ fn library_allowed(library: &serde_json::Value) -> bool {
 fn native_classifier_key(library: &serde_json::Value) -> Option<String> {
     let template = library["natives"][current_os_name()].as_str()?;
     let arch = if cfg!(target_pointer_width = "64") { "64" } else { "32" };
-    Some(template.replace("\${arch}", arch))
+    Some(template.replace("${arch}", arch))
 }
 
 fn extract_natives(archive_path: &Path, destination: &Path) -> Result<(), String> {
@@ -434,7 +434,7 @@ fn offline_uuid(player_name: &str) -> String {
 
 fn expand_argument(value: &str, replacements: &[(String, String)]) -> String {
     replacements.iter().fold(value.to_owned(), |result, (key, replacement)| {
-        result.replace(&format!("\${{{key}}}"), replacement)
+        result.replace(&format!("${{{key}}}"), replacement)
     })
 }
 
