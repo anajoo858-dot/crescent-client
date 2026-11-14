@@ -159,8 +159,8 @@ function App() {
               <div className="panel ram-panel">
                 <div className="panel-top"><div className="panel-icon"><Cpu size={17} /></div><span>MEMORY ALLOCATION</span><span className="panel-status">TUNING</span></div>
                 <div className="ram-value">{ram}<small> GB</small></div>
-                <input aria-label="Memory allocation" type="range" min="2" max="8" step="1" value={ram} onChange={e => { const value = Number(e.target.value); setRam(value); void window.crescent?.saveSettings({ ramGb: value }).catch(() => setNotice("Could not save RAM settings.")); }} />
-                <div className="range-labels"><span>2 GB</span><span>8 GB</span></div>
+                <input aria-label="Memory allocation" type="range" min="2" max="6" step="1" value={ram} onChange={e => { const value = Number(e.target.value); setRam(value); void window.crescent?.saveSettings({ ramGb: value }).catch(() => setNotice("Could not save RAM settings.")); }} />
+                <div className="range-labels"><span>2 GB</span><span>6 GB</span></div>
                 <div className="panel-foot"><HardDrive size={13} /> Adjust based on your system memory</div>
               </div>
 
