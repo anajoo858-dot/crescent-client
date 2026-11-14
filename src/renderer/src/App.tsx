@@ -57,6 +57,19 @@ function App() {
     } finally { setInstanceBusy(false); }
   };
 
+  const launchInstance = async (instance: CrescentInstance) => {
+    if (!window.crescent) return;
+    const playerName = window.prompt("Enter your offline profile name (1–16 characters):", "Player");
+    if (!playerName?.trim()) return;
+    setNotice(`Starting Minecraft ${instance.version}...`);
+    try {
+      const result = await window.crescent.launchInstance(instance.id, playerName.trim());
+      setNotice(`Minecraft started for ${result.playerName} (process ${result.processId}). ${result.authentication}`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not launch Minecraft.");
+    }
+  };
+
   const installInstance = async (instance: CrescentInstance) => {
     if (!window.crescent || installingId) return;
     setInstallingId(instance.id);
@@ -179,9 +192,14 @@ function App() {
                     <div className="panel-icon"><Layers3 size={18} /></div>
                     <div className="instance-info"><strong>{instance.name}</strong><p>Minecraft {instance.version} · Vanilla · Separate mods and config folders</p></div>
                     <span className="panel-status">LOCAL</span>
-                    <button className="secondary-button" disabled={installingId !== null} onClick={() => void installInstance(instance)}>
-                      <Download size={14} /> {installingId === instance.id ? "Installing..." : "Install files"}
-                    </button>
+                    <div className="instance-actions">
+                      <button className="secondary-button" disabled={installingId !== null} onClick={() => void installInstance(instance)}>
+                        <Download size={14} /> {installingId === instance.id ? "Installing..." : "Install files"}
+                      </button>
+                      <button className="primary-button" disabled={installingId !== null} onClick={() => void launchInstance(instance)}>
+                        <Play size={14} fill="currentColor" /> Launch
+                      </button>
+                    </div>
                   </div>
                 ))}
                 <button className="secondary-button" disabled={instanceBusy} onClick={() => void createInstance()}><Plus size={15} /> Create another instance</button>
